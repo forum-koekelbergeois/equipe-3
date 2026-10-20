@@ -1,0 +1,68 @@
+body {
+  margin: 0;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background-color: skyblue;
+}
+
+.page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.cache {
+  display: none;
+}
+
+h1 {
+  font-family: "Marker Felt", "Chalkduster", "Comic Sans MS", "Brush Script MT", cursive;
+  font-size: 8vw;
+  font-weight: bold;
+  text-align: center;
+  color: darkblue;
+  transform: rotate(-4deg);
+  text-shadow: 4px 4px 0 white, 7px 7px 0 navy;
+  letter-spacing: 0.1em;
+}
+
+h2 {
+  font-size: 3rem;
+  color: darkblue;
+}
+
+button {
+  font-size: 2rem;
+  padding: 0.5em 1.5em;
+  margin: 8px;
+  color: white;
+  background-color: darkblue;
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+button:hover {
+  background-color: navy;
+}
+
+#jeu {
+  max-width: 95vw;
+  background-color: lightcyan;
+  border: 4px solid darkblue;
+  border-radius: 12px;
+}
+
+#etat {
+  font-size: 2rem;
+  color: darkblue;
+  margin: 10px;
+}
+
+#message {
+  font-size: 4rem;
+  color: darkblue;
+  margin: 10px;
+}
