@@ -1,12 +1,367 @@
-const canvas = document.getElementById("jeu");
-const ctx = canvas.getContext("2d");
+let canvas = document.getElementById("jeu");   // change en mode 2 joueurs (une toile par joueur)
+let ctx = canvas.getContext("2d");
 const scoreEl = document.getElementById("score");
 const recordEl = document.getElementById("record");
 
 const SOL = 330;
-const POLICE = "Permanent Marker, Marker Felt, Segoe Print, Impact, cursive";
+const POLICE = "'Permanent Marker', 'Ink Free', 'Segoe Print', 'Marker Felt', 'Comic Sans MS', cursive";
+
+// ---------- Pièces, boutiques et skins ----------
+const PRIX_SKIN = 50;
+const accueilEl = document.getElementById("accueil");
+const messageEl = document.getElementById("messageBoutique");
+
+const SKINS_PERSO = [
+  { id: "normal", nom: "Normal" },
+  { id: "spiderman", nom: "Spider-Man" },
+  { id: "ronaldo", nom: "Ronaldo" },
+  { id: "zorok", nom: "Zorok" },
+];
+const SKINS_VOITURE = [
+  { id: "normale", nom: "Police" },
+  { id: "taxi", nom: "Taxi" },
+  { id: "tank", nom: "Tank" },
+  { id: "volante", nom: "Voiture volante" },
+];
+
+// couleurs du personnage pour chaque skin
+const COULEURS_PERSO = {
+  normal:    { jambes: "#2b4c9b", haut: "#ff7a1a", bras: "#c9570a", poche: "#e5640a", peau: "#e0ac69", mains: "#e0ac69", cheveux: "#111", chaussures: "#fff", visiere: true },
+  spiderman: { jambes: "#1b3fa0", haut: "#d81e2c", bras: "#a01420", poche: "#1b3fa0", peau: "#d81e2c", mains: "#d81e2c", cheveux: "#d81e2c", chaussures: "#d81e2c", visiere: false },
+  ronaldo:   { jambes: "#e0ac69", haut: "#c8102e", bras: "#9d0c24", poche: "#0a7a2f", peau: "#e0ac69", mains: "#e0ac69", cheveux: "#2a1a10", chaussures: "#111", chaussettes: "#c8102e", short: "#0a7a2f", visiere: false },
+  zorok:     { jambes: "#5b2a86", haut: "#7a3cb8", bras: "#5b2a86", poche: "#3fd04a", peau: "#4fd45a", mains: "#4fd45a", cheveux: "#2a7a30", chaussures: "#2a1a40", visiere: false },
+};
+// couleurs de la voiture de fuite pour chaque skin
+const COULEURS_VOITURE = {
+  normale: ["#ff4a4a", "#a50f0f"],
+  taxi:    ["#ffe14d", "#d9a400"],
+  tank:    ["#6b7a3a", "#3a4420"],
+  volante: ["#6fc3ff", "#1b5fd1"],
+};
+
+// Petits sons d'effets (pièce, saut, bonus, achat...). Ils ont leur propre contexte audio,
+// pour ne pas être coupés quand la musique s'arrête.
+let audioEffets = null;
+
+function noteEffet(freq, retard, duree, forme, force) {
+  const AudioCtx = window.AudioContext || window.webkitAudioContext;
+  if (!AudioCtx) return;
+  if (!audioEffets) audioEffets = new AudioCtx();
+  audioEffets.resume();
+  const debut = audioEffets.currentTime + retard;
+  const osc = audioEffets.createOscillator();
+  const volume = audioEffets.createGain();
+  osc.type = forme;
+  osc.frequency.value = freq;
+  volume.gain.setValueAtTime(force, debut);
+  volume.gain.exponentialRampToValueAtTime(0.001, debut + duree);
+  osc.connect(volume);
+  volume.connect(audioEffets.destination);
+  osc.start(debut);
+  osc.stop(debut + duree);
+}
+
+function sonEffet(nom) {
+  if (nom === "piece") {
+    noteEffet(988, 0, 0.08, "square", 0.07);
+    noteEffet(1319, 0.08, 0.16, "square", 0.07);
+  } else if (nom === "saut") {
+    noteEffet(330, 0, 0.08, "triangle", 0.15);
+    noteEffet(440, 0.06, 0.1, "triangle", 0.15);
+  } else if (nom === "roulade") {
+    [300, 450, 650, 900].forEach((f, i) => noteEffet(f, i * 0.04, 0.08, "sawtooth", 0.06));
+  } else if (nom === "bonus") {
+    [523, 659, 784, 1047].forEach((f, i) => noteEffet(f, i * 0.07, 0.12, "square", 0.06));
+  } else if (nom === "achat") {
+    [784, 988, 1175, 1568].forEach((f, i) => noteEffet(f, i * 0.09, 0.18, "triangle", 0.15));
+  } else if (nom === "equiper") {
+    noteEffet(659, 0, 0.08, "triangle", 0.15);
+    noteEffet(880, 0.08, 0.14, "triangle", 0.15);
+  } else if (nom === "refus") {
+    noteEffet(196, 0, 0.2, "sawtooth", 0.1);
+    noteEffet(147, 0.12, 0.25, "sawtooth", 0.1);
+  } else if (nom === "perdu") {
+    [392, 330, 262, 196].forEach((f, i) => noteEffet(f, i * 0.12, 0.2, "triangle", 0.15));
+  }
+}
+
+let nbPieces = 0;
+let skinsAchetes = ["normal", "normale"];
+let skinPerso = "normal";
+let skinVoiture = "normale";
+
+let meilleursScores = [];  // les 5 meilleures distances, de la plus grande à la plus petite
+
+function ajouterScore(distance) {
+  if (distance <= 0) return;
+  meilleursScores.push(distance);
+  meilleursScores.sort((a, b) => b - a);
+  meilleursScores = meilleursScores.slice(0, 5);
+  sauvegarder();
+}
+
+function afficherScores() {
+  const liste = document.getElementById("listeScores");
+  liste.innerHTML = "";
+  if (meilleursScores.length === 0) {
+    liste.textContent = "Pas encore de score. À toi de jouer !";
+    return;
+  }
+  const medailles = ["🥇", "🥈", "🥉", "4.", "5."];
+  meilleursScores.forEach((distance, i) => {
+    const ligne = document.createElement("div");
+    ligne.textContent = medailles[i] + " " + distance + " m";
+    liste.appendChild(ligne);
+  });
+}
+
+function sauvegarder() {
+  try {
+    localStorage.setItem("coursEsquive", JSON.stringify({ nbPieces, skinsAchetes, skinPerso, skinVoiture, meilleursScores }));
+  } catch (e) { /* pas grave : on ne sauvegarde pas */ }
+}
+
+function charger() {
+  try {
+    const d = JSON.parse(localStorage.getItem("coursEsquive"));
+    if (!d) return;
+    nbPieces = Number(d.nbPieces) || 0;
+    if (Array.isArray(d.skinsAchetes)) skinsAchetes = d.skinsAchetes;
+    if (COULEURS_PERSO[d.skinPerso]) skinPerso = d.skinPerso;
+    if (COULEURS_VOITURE[d.skinVoiture]) skinVoiture = d.skinVoiture;
+    if (Array.isArray(d.meilleursScores)) {
+      meilleursScores = d.meilleursScores.map(Number).filter((n) => n > 0).slice(0, 5);
+      record = meilleursScores[0] || 0;
+      recordEl.textContent = record;
+    }
+  } catch (e) { /* on garde les valeurs de départ */ }
+}
+
+function afficherPieces() {
+  document.getElementById("pieces").textContent = nbPieces;
+  document.getElementById("piecesAccueil").textContent = nbPieces;
+}
+
+// Petit dessin d'un skin pour la boutique (on réutilise les fonctions de dessin du jeu)
+function dessinerApercu(type, id, toile) {
+  const sauve = { ctx, skinPerso, skinVoiture, voiture, joueurCache };
+  ctx = toile.getContext("2d");
+  ctx.clearRect(0, 0, toile.width, toile.height);
+  ctx.save();
+  if (type === "perso") {
+    skinPerso = id;
+    ctx.translate(toile.width / 2, toile.height - 8);
+    dessinerCorps(0, false);
+  } else {
+    skinVoiture = id;
+    voiture = { x: 0, vers: 1, roue: 0, vitesse: 0 };
+    joueurCache = false;
+    ctx.translate(5, toile.height - 10);
+    ctx.scale(0.85, 0.85);
+    ctx.translate(0, -SOL);
+    dessinerVoitureFuite();
+  }
+  ctx.restore();
+  ({ ctx, skinPerso, skinVoiture, voiture, joueurCache } = sauve);
+}
+
+function remplirBoutique(conteneurId, type, skins, choisi, choisir) {
+  const conteneur = document.getElementById(conteneurId);
+  conteneur.innerHTML = "";
+  for (const skin of skins) {
+    const bouton = document.createElement("button");
+    const possede = skinsAchetes.includes(skin.id);
+    const texte = document.createElement("span");
+    if (skin.id === choisi) {
+      texte.textContent = skin.nom + " ✔ Équipé";
+      bouton.className = "choisi";
+    } else if (possede) {
+      texte.textContent = skin.nom + " — Équiper";
+      bouton.className = "possede";
+    } else {
+      texte.textContent = skin.nom + " — " + PRIX_SKIN + " pièces";
+    }
+    const apercu = document.createElement("canvas");
+    apercu.width = type === "perso" ? 70 : 130;
+    apercu.height = 100;
+    dessinerApercu(type, skin.id, apercu);
+    bouton.appendChild(apercu);
+    bouton.appendChild(texte);
+    bouton.addEventListener("click", () => {
+      if (!possede) {
+        if (nbPieces < PRIX_SKIN) {
+          messageEl.textContent = "Pas assez de pièces ! Il en faut " + PRIX_SKIN + ".";
+          sonEffet("refus");
+          return;
+        }
+        nbPieces -= PRIX_SKIN;
+        skinsAchetes.push(skin.id);
+        sonEffet("achat");
+        messageEl.textContent = skin.nom + " est à toi ! Clique sur « Équiper » pour le mettre.";
+      } else {
+        choisir(skin.id);   // le skin est équipé tout de suite
+        sonEffet("equiper");
+        messageEl.textContent = skin.nom + " est équipé !";
+      }
+      sauvegarder();
+      afficherBoutiques();
+    });
+    conteneur.appendChild(bouton);
+  }
+}
+
+function afficherBoutiques() {
+  remplirBoutique("listePersos", "perso", SKINS_PERSO, skinPerso, (id) => { skinPerso = id; });
+  remplirBoutique("listeVoitures", "voiture", SKINS_VOITURE, skinVoiture, (id) => { skinVoiture = id; });
+  afficherPieces();
+  afficherScores();
+}
+
+function ouvrirAccueil() {
+  sauvegarder();
+  arreterMusique();
+  if (window.speechSynthesis) speechSynthesis.cancel();
+  etat = "attente";
+  choisirMode(false);
+  messageEl.textContent = "";
+  afficherBoutiques();
+  accueilEl.classList.remove("cache");
+}
+
+// Met la page en plein écran (Échap pour sortir). Si le navigateur refuse, le jeu continue normalement.
+function pleinEcran() {
+  if (document.fullscreenElement || !document.documentElement.requestFullscreen) return;
+  document.documentElement.requestFullscreen().catch(() => {});
+}
+
+function lancerPartie() {
+  pleinEcran();
+  accueilEl.classList.add("cache");
+  choisirMode(false);
+  recommencer();
+}
+
+// ---------- Mode 2 joueurs : l'écran est partagé en deux ----------
+// Chaque joueur a sa propre toile et sa propre course. Le code du jeu utilise des variables
+// communes : avant de faire jouer un joueur, on charge son état, puis on le range.
+const toiles = [document.getElementById("jeu"), document.getElementById("jeu2")];
+const dessins = toiles.map((t) => t.getContext("2d"));
+let deuxJoueurs = false;
+let etatsJoueurs = [];
+let finDeuxJoueurs = false;
+let gagnantDeuxJoueurs = -1;   // 0 = joueur 1, 1 = joueur 2, -1 = égalité
+
+function prendreEtat() {
+  return {
+    joueur, obstacles, vitesse, score, compteur, etat, objets, pieces, etincelles, vol, protection, bottes, bouclier,
+    voiture, typeFinale, trajetFait, phaseFinale, minuteurFinale, joueurCache, debutGagne, defilement,
+    paysageAffiche, paysagePrecedent, fondu, annonce,
+  };
+}
+
+function poserEtat(e) {
+  ({
+    joueur, obstacles, vitesse, score, compteur, etat, objets, pieces, etincelles, vol, protection, bottes, bouclier,
+    voiture, typeFinale, trajetFait, phaseFinale, minuteurFinale, joueurCache, debutGagne, defilement,
+    paysageAffiche, paysagePrecedent, fondu, annonce,
+  } = e);
+}
+
+// En 2 joueurs, chaque toile prend toute la largeur de la fenêtre : on l'élargit
+// (sans l'étirer) pour que le décor remplisse la moitié d'écran.
+function ajusterToiles() {
+  const hauteurAffichee = Math.max(150, (window.innerHeight - 80) / 2);
+  const largeur = deuxJoueurs
+    ? Math.min(2400, Math.max(800, Math.round((400 * window.innerWidth) / hauteurAffichee)))
+    : 800;
+  for (const t of toiles) if (t.width !== largeur) t.width = largeur;
+}
+window.addEventListener("resize", ajusterToiles);
+
+function choisirMode(deux) {
+  deuxJoueurs = deux;
+  document.body.classList.toggle("deux", deux);
+  toiles[1].hidden = !deux;
+  ajusterToiles();
+  if (!deux) {
+    canvas = toiles[0];
+    ctx = dessins[0];
+  }
+  document.getElementById("aide").innerHTML = deux
+    ? "Joueur 1 (haut) : W = sauter, S = roulade &nbsp;&nbsp; Joueur 2 (bas) : ↑ = sauter, ↓ = roulade"
+    : "Espace = sauter &nbsp;&nbsp; Flèche du bas = roulade";
+}
+
+function lancerPartie2() {
+  pleinEcran();
+  accueilEl.classList.add("cache");
+  choisirMode(true);
+  etatsJoueurs = [];
+  finDeuxJoueurs = false;
+  for (let i = 0; i < 2; i++) {
+    recommencer();
+    etatsJoueurs.push(prendreEtat());
+  }
+}
+
+function actionJoueur(i, action) {
+  poserEtat(etatsJoueurs[i]);
+  if (etat === "jeu") action();
+  etatsJoueurs[i] = prendreEtat();
+}
+
+function touchesDeuxJoueurs(e) {
+  const actions = { KeyW: [0, sauter], KeyS: [0, glisser], ArrowUp: [1, sauter], ArrowDown: [1, glisser] };
+  if (actions[e.code]) {
+    e.preventDefault();
+    actionJoueur(actions[e.code][0], actions[e.code][1]);
+  } else if ((e.code === "Space" || e.code === "Enter") && finDeuxJoueurs) {
+    e.preventDefault();
+    lancerPartie2();
+  }
+}
+
+function distanceDe(e) {
+  return e.etat === "gagne" ? DISTANCE_FIN : Math.floor(e.score / 6);
+}
+
+function boucleDeuxJoueurs() {
+  // 1) on fait avancer chaque course
+  for (let i = 0; i < 2; i++) {
+    canvas = toiles[i];
+    ctx = dessins[i];
+    poserEtat(etatsJoueurs[i]);
+    mettreAJour();
+    etatsJoueurs[i] = prendreEtat();
+  }
+  // 2) quand les deux ont fini, la plus grande distance gagne
+  const fini = etatsJoueurs.every((e) => e.etat === "perdu" || e.etat === "gagne");
+  if (fini && !finDeuxJoueurs) {
+    finDeuxJoueurs = true;
+    arreterMusique();
+    const [a, b] = etatsJoueurs.map(distanceDe);
+    gagnantDeuxJoueurs = a > b ? 0 : b > a ? 1 : -1;
+  }
+  // 3) on dessine chaque moitié de l'écran
+  for (let i = 0; i < 2; i++) {
+    canvas = toiles[i];
+    ctx = dessins[i];
+    poserEtat(etatsJoueurs[i]);
+    dessiner();
+    ctx.textAlign = "right";
+    ecrireTexte("Joueur " + (i + 1) + " : " + distanceDe(etatsJoueurs[i]) + " m", canvas.width - 15, 35, 26, 4);
+    if (finDeuxJoueurs) {
+      ctx.textAlign = "center";
+      ecrireTexte(gagnantDeuxJoueurs === -1 ? "Égalité !" : "Joueur " + (gagnantDeuxJoueurs + 1) + " gagne !", canvas.width / 2, 210, 46, 7);
+      ecrireTexte("Espace = rejouer", canvas.width / 2, 250, 24, 5);
+    }
+    etatsJoueurs[i] = prendreEtat();
+  }
+}
 
 let joueur, obstacles, vitesse, score, record = 0, etat = "attente", compteur;
+let pieces = [];     // pièces à ramasser dans la course
+let etincelles = []; // petites étincelles quand on ramasse une pièce
 let objets = [];     // objets spéciaux (jetpack)
 let vol = 0;         // temps de vol qui reste (en images)
 let protection = 0;  // petit temps sans danger après l'atterrissage
@@ -167,27 +522,14 @@ function arreterMusique() {
   }
 }
 
-// La grosse tête crie « six seven » avec la voix du navigateur
-let debutPerdu = 0;  // moment où la partie est perdue (pour animer la grosse tête)
-
-function crierSixSeven() {
-  debutPerdu = Date.now();
-  if (!window.speechSynthesis) return;
-  speechSynthesis.cancel();
-  // il crie deux fois, fort et aigu
-  for (let i = 0; i < 2; i++) {
-    const voix = new SpeechSynthesisUtterance("six seven!");
-    voix.lang = "en-US";
-    voix.volume = 1;
-    voix.rate = 1.15;
-    voix.pitch = 1.8;
-    speechSynthesis.speak(voix);
-  }
-}
+// moment où la partie est perdue
+let debutPerdu = 0;
 
 function recommencer() {
   if (window.speechSynthesis) speechSynthesis.cancel();
   objets = [];
+  pieces = [];
+  etincelles = [];
   vol = 0;
   protection = 0;
   bottes = 0;
@@ -205,23 +547,41 @@ function recommencer() {
 }
 
 function sauter() {
+  if (!accueilEl.classList.contains("cache")) return;  // sur la page d'accueil, on utilise START
   if (etat === "finale") return;  // pendant la fin, les touches ne font rien
   if (etat !== "jeu") { recommencer(); return; }
   if (vol > 0) return;
-  if (joueur.y >= SOL && !joueur.glisse) joueur.vy = bottes > 0 ? -17 : -13;
+  if (joueur.y >= SOL && !joueur.glisse) {
+    joueur.vy = bottes > 0 ? -17 : -13;
+    sonEffet("saut");
+  }
 }
 
 function glisser() {
   if (etat !== "jeu" || vol > 0) return;
-  if (joueur.y >= SOL) { joueur.glisse = true; joueur.tempsGlisse = 40; }
+  if (joueur.y >= SOL && !joueur.glisse) {
+    joueur.glisse = true;   // « glisse » veut dire ici : en roulade
+    joueur.tempsGlisse = 40;
+    sonEffet("roulade");
+  }
 }
 
 document.addEventListener("keydown", (e) => {
+  if (deuxJoueurs) { touchesDeuxJoueurs(e); return; }
   if (e.code === "Space") { e.preventDefault(); sauter(); }
   if (e.code === "ArrowDown") { e.preventDefault(); glisser(); }
 });
 document.getElementById("btnSaut").addEventListener("click", sauter);
 document.getElementById("btnGlisse").addEventListener("click", glisser);
+document.getElementById("btnStart").addEventListener("click", lancerPartie);
+document.getElementById("btn2Joueurs").addEventListener("click", lancerPartie2);
+document.getElementById("btnAccueil").addEventListener("click", (e) => {
+  e.currentTarget.blur();  // pour que la barre Espace ne le déclenche pas
+  ouvrirAccueil();
+});
+
+charger();
+afficherBoutiques();
 
 function creerObstacle(x) {
   // "bas" : on saute par-dessus. "haut" : on glisse en dessous.
@@ -297,10 +657,39 @@ function mettreAJour() {
       if (obj.genre === "jetpack") vol = DUREE_VOL;
       if (obj.genre === "bottes") bottes = DUREE_BOTTES;
       if (obj.genre === "bouclier") bouclier = DUREE_BOUCLIER;
+      sonEffet("bonus");
       objets = [];
       break;
     }
   }
+
+  // des pièces apparaissent de temps en temps, au hasard, à trois hauteurs différentes
+  if (vol === 0 && Math.random() < 0.006) {
+    const hauteurs = [SOL - 30, SOL - 80, SOL - 130];
+    pieces.push({ x: canvas.width + 20, y: hauteurs[Math.floor(Math.random() * hauteurs.length)], r: 12 });
+  }
+  for (const p of pieces) p.x -= vitesse;
+  pieces = pieces.filter((p) => p.x > -30);
+  const corps = boiteJoueur();
+  pieces = pieces.filter((p) => {
+    const prise = touche(corps, { x: p.x - p.r, y: p.y - p.r, w: p.r * 2, h: p.r * 2 });
+    if (prise) {
+      nbPieces++;
+      sonEffet("piece");
+      for (let i = 0; i < 8; i++) {   // petites étincelles dorées
+        const angle = (i * Math.PI) / 4;
+        etincelles.push({ x: p.x, y: p.y, vx: Math.cos(angle) * 3, vy: Math.sin(angle) * 3, vie: 20 });
+      }
+    }
+    return !prise;
+  });
+  for (const e of etincelles) {
+    e.x += e.vx - vitesse * 0.5;
+    e.y += e.vy;
+    e.vie--;
+  }
+  etincelles = etincelles.filter((e) => e.vie > 0);
+  if (nbPieces !== Number(document.getElementById("pieces").textContent)) afficherPieces();
 
   if (joueur.glisse) {
     joueur.tempsGlisse--;
@@ -325,15 +714,18 @@ function mettreAJour() {
   for (const o of obstacles) {
     if (vol === 0 && protection === 0 && bouclier === 0 && touche(moi, boiteObstacle(o))) {
       etat = "perdu";
-      arreterMusique();
-      crierSixSeven();
+      sauvegarder();
+      debutPerdu = Date.now();
+      sonEffet("perdu");
+      if (!deuxJoueurs) arreterMusique();   // en 2 joueurs, la musique continue pour l'autre joueur
       record = Math.max(record, metres());
       recordEl.textContent = record;
+      ajouterScore(metres());
     }
   }
 
-  if (etat === "jeu" && metres() >= DISTANCE_FIN) demarrerFinale("fin");
-  else if (etat === "jeu" && !trajetFait && metres() >= DEBUT_TRAJET) demarrerFinale("trajet");
+  // il n'y a pas de fin : on court tant qu'on ne se cogne pas
+  if (etat === "jeu" && !trajetFait && metres() >= DEBUT_TRAJET) demarrerFinale("trajet");
 }
 
 // Après le trajet, la voiture continue sa route et sort de l'écran pendant que la course reprend
@@ -356,6 +748,7 @@ function demarrerFinale(type) {
   minuteurFinale = 0;
   obstacles = [];
   objets = [];
+  pieces = [];
   vol = 0;
   joueur.glisse = false;
   voiture = { x: canvas.width + 60, vers: -1, roue: 0, vitesse: 0 };
@@ -449,11 +842,15 @@ function sonVictoire() {
 
 function gagner() {
   etat = "gagne";
+  sauvegarder();
   debutGagne = Date.now();
-  arreterMusique();
-  sonVictoire();
+  if (!deuxJoueurs) {
+    arreterMusique();
+    sonVictoire();
+  }
   record = Math.max(record, metres());
   recordEl.textContent = record;
+  ajouterScore(metres());
 }
 
 // ---------- Dessin ----------
@@ -553,72 +950,304 @@ function dessinerObjet(obj) {
 }
 
 // Le personnage est dessiné avec les pieds en (0, 0).
+// Chaque skin a ses propres détails : tenue, mains, tête.
 function dessinerCorps(pas, enLair) {
+  const c = COULEURS_PERSO[skinPerso];
+  const forme = () => {
+    ctx.beginPath();
+    ctx.roundRect(-12, -50, 24, 34, 7);
+  };
   ctx.lineCap = "round";
-  // jambes
-  ctx.strokeStyle = "#2b4c9b";
-  ctx.lineWidth = 8;
+  // jambes, chaussettes et chaussures
   const pieds = enLair
     ? [[10, -6], [-8, -10]]
     : [[pas * 13, -3 - Math.max(0, -pas) * 8], [-pas * 13, -3 - Math.max(0, pas) * 8]];
   for (const [fx, fy] of pieds) {
+    ctx.strokeStyle = c.jambes;
+    ctx.lineWidth = 8;
     ctx.beginPath();
     ctx.moveTo(0, -20);
     ctx.lineTo(fx, fy);
     ctx.stroke();
-    ctx.fillStyle = "#fff";           // baskets
+    if (c.chaussettes) {
+      ctx.strokeStyle = c.chaussettes;
+      ctx.beginPath();
+      ctx.moveTo(fx * 0.5, -20 + (fy + 20) * 0.5);
+      ctx.lineTo(fx, fy);
+      ctx.stroke();
+    }
+    ctx.fillStyle = c.chaussures;
     ctx.beginPath();
     ctx.ellipse(fx + 3, fy + 1, 7, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = skinPerso === "zorok" ? "#5dff6e" : "#000";   // semelles lumineuses pour Zorok
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  }
+  if (skinPerso === "ronaldo") {
+    // short vert
+    ctx.fillStyle = c.short;
+    ctx.beginPath();
+    ctx.roundRect(-12, -28, 24, 13, 4);
     ctx.fill();
     ctx.strokeStyle = "#000";
     ctx.lineWidth = 1.5;
     ctx.stroke();
-    ctx.strokeStyle = "#2b4c9b";
-    ctx.lineWidth = 8;
   }
-  // bras de derrière
-  ctx.strokeStyle = "#c9570a";
+
+  // bras de derrière et sa main
+  ctx.strokeStyle = c.bras;
   ctx.lineWidth = 7;
   ctx.beginPath();
   ctx.moveTo(0, -42);
   ctx.lineTo(-pas * 14, -28);
   ctx.stroke();
-  // sweat à capuche
-  ctx.fillStyle = "#ff7a1a";
+  ctx.fillStyle = c.mains;
   ctx.beginPath();
-  ctx.roundRect(-12, -50, 24, 34, 7);
+  ctx.arc(-pas * 14, -28, 4.5, 0, Math.PI * 2);
   ctx.fill();
+
+  // torse
+  forme();
+  ctx.fillStyle = c.haut;
+  ctx.fill();
+  ctx.save();
+  forme();
+  ctx.clip();
+  if (skinPerso === "normal") {
+    ctx.fillStyle = c.poche;
+    ctx.fillRect(-7, -30, 14, 7);                       // poche
+    ctx.strokeStyle = "#fff";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(-3, -50);
+    ctx.lineTo(-3, -42);
+    ctx.moveTo(3, -50);
+    ctx.lineTo(3, -42);                                 // cordons du capuchon
+    ctx.stroke();
+  } else if (skinPerso === "spiderman") {
+    ctx.fillStyle = c.poche;                            // côtés et ceinture bleus
+    ctx.fillRect(-12, -50, 5, 34);
+    ctx.fillRect(7, -50, 5, 34);
+    ctx.fillRect(-12, -22, 24, 6);
+    ctx.strokeStyle = "#000";                           // toile d'araignée
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = -Math.PI / 2 + (i * Math.PI) / 5 - Math.PI / 10;
+      ctx.moveTo(0, -46);
+      ctx.lineTo(Math.cos(a) * 20, -46 + Math.sin(a) * 20 + 14);
+    }
+    ctx.stroke();
+    for (const r of [5, 9, 13]) {
+      ctx.beginPath();
+      ctx.arc(0, -46, r, 0.2, Math.PI - 0.2);
+      ctx.stroke();
+    }
+    ctx.fillStyle = "#000";                             // petite araignée sur la poitrine
+    ctx.beginPath();
+    ctx.ellipse(0, -36, 2.5, 4, 0, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.lineWidth = 1.2;
+    ctx.beginPath();
+    for (const dy of [-39, -36, -33]) {
+      ctx.moveTo(-6, dy + 2);
+      ctx.lineTo(0, dy);
+      ctx.lineTo(6, dy + 2);
+    }
+    ctx.stroke();
+  } else if (skinPerso === "ronaldo") {
+    ctx.fillStyle = c.poche;                            // col vert et bas du maillot
+    ctx.beginPath();
+    ctx.moveTo(-7, -50);
+    ctx.lineTo(7, -50);
+    ctx.lineTo(0, -41);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillRect(-12, -30, 24, 3);
+    ctx.fillStyle = "#fff";                             // numéro 7
+    ctx.font = "bold 15px Impact, sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("7", 0, -32);
+  } else if (skinPerso === "zorok") {
+    ctx.strokeStyle = "#3a1a5e";                        // plaques de l'armure
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-12, -44);
+    ctx.lineTo(12, -36);
+    ctx.moveTo(-12, -30);
+    ctx.lineTo(12, -22);
+    ctx.stroke();
+    ctx.fillStyle = "#ffe14d";                          // ceinture
+    ctx.fillRect(-12, -23, 24, 4);
+    const lueur = ctx.createRadialGradient(0, -38, 1, 0, -38, 9);   // cœur d'énergie
+    lueur.addColorStop(0, "#eaffea");
+    lueur.addColorStop(0.5, "#3fff5a");
+    lueur.addColorStop(1, "rgba(63, 255, 90, 0)");
+    ctx.fillStyle = lueur;
+    ctx.beginPath();
+    ctx.arc(0, -38, 9, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  forme();
   ctx.strokeStyle = "#000";
   ctx.lineWidth = 2;
   ctx.stroke();
-  ctx.fillStyle = "#e5640a";
-  ctx.fillRect(-7, -30, 14, 7);        // poche
-  // bras de devant
-  ctx.strokeStyle = "#ff7a1a";
+
+  // épaulière pointue de Zorok
+  if (skinPerso === "zorok") {
+    ctx.fillStyle = "#3a1a5e";
+    ctx.beginPath();
+    ctx.moveTo(-4, -50);
+    ctx.lineTo(4, -58);
+    ctx.lineTo(10, -48);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  // bras de devant et sa main
+  ctx.strokeStyle = c.haut;
   ctx.lineWidth = 7;
   ctx.beginPath();
   ctx.moveTo(0, -42);
   ctx.lineTo(pas * 14, -28);
   ctx.stroke();
+  if (skinPerso === "ronaldo") {
+    ctx.strokeStyle = "#ffd23f";                        // brassard de capitaine
+    ctx.lineWidth = 7;
+    ctx.beginPath();
+    ctx.moveTo(pas * 3, -40);
+    ctx.lineTo(pas * 5, -37);
+    ctx.stroke();
+  }
+  ctx.fillStyle = c.mains;
+  ctx.beginPath();
+  ctx.arc(pas * 14, -28, 4.5, 0, Math.PI * 2);
+  ctx.fill();
+
   // tête
-  ctx.fillStyle = "#e0ac69";
+  if (skinPerso === "zorok") {
+    // antennes avec des boules lumineuses
+    ctx.strokeStyle = c.peau;
+    ctx.lineWidth = 2.5;
+    ctx.beginPath();
+    ctx.moveTo(-2, -69);
+    ctx.quadraticCurveTo(-8, -76, -7, -84);
+    ctx.moveTo(6, -70);
+    ctx.quadraticCurveTo(12, -77, 12, -85);
+    ctx.stroke();
+    ctx.fillStyle = Math.floor(Date.now() / 300) % 2 ? "#ffe14d" : "#fff7a8";
+    ctx.beginPath();
+    ctx.arc(-7, -85, 3.5, 0, Math.PI * 2);
+    ctx.arc(12, -86, 3.5, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.fillStyle = c.peau;
   ctx.beginPath();
   ctx.arc(2, -60, 10, 0, Math.PI * 2);
   ctx.fill();
   ctx.strokeStyle = "#000";
   ctx.lineWidth = 2;
   ctx.stroke();
-  // casquette
-  ctx.fillStyle = "#111";
+
+  if (skinPerso === "spiderman") {
+    // fils de la toile sur la cagoule
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(2, -60, 10, 0, Math.PI * 2);
+    ctx.clip();
+    ctx.strokeStyle = "rgba(0, 0, 0, 0.55)";
+    ctx.lineWidth = 0.8;
+    ctx.beginPath();
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      ctx.moveTo(2, -60);
+      ctx.lineTo(2 + Math.cos(a) * 12, -60 + Math.sin(a) * 12);
+    }
+    ctx.stroke();
+    for (const r of [4, 7]) {
+      ctx.beginPath();
+      ctx.arc(2, -60, r, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+    ctx.restore();
+    // grands yeux blancs
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 1.6;
+    ctx.beginPath();
+    ctx.moveTo(3, -61);
+    ctx.lineTo(13, -65);
+    ctx.lineTo(13, -58);
+    ctx.lineTo(6, -55.5);
+    ctx.closePath();
+    ctx.fill();
+    ctx.stroke();
+  } else if (skinPerso === "zorok") {
+    // grand œil noir qui brille et petite bouche
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.ellipse(7, -60, 5.5, 3.6, -0.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#ffe14d";
+    ctx.beginPath();
+    ctx.arc(8.5, -61, 1.4, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#1c5a22";
+    ctx.lineWidth = 1.3;
+    ctx.beginPath();
+    ctx.moveTo(5, -54);
+    ctx.quadraticCurveTo(8, -52, 11, -54);
+    ctx.stroke();
+  } else if (skinPerso === "ronaldo") {
+    // cheveux noirs avec une mèche relevée
+    ctx.fillStyle = c.cheveux;
+    ctx.beginPath();
+    ctx.arc(2, -62, 10.5, Math.PI, 0);
+    ctx.fill();
+    ctx.beginPath();
+    ctx.ellipse(8, -71, 7, 3.5, -0.3, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillStyle = "#000";                             // œil, sourcil et sourire
+    ctx.beginPath();
+    ctx.arc(7, -59, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#2a1a10";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.moveTo(4, -63);
+    ctx.lineTo(10, -63.5);
+    ctx.stroke();
+    ctx.strokeStyle = "#7a3a20";
+    ctx.beginPath();
+    ctx.arc(7, -55, 3, 0.2, Math.PI - 0.6);
+    ctx.stroke();
+  } else {
+    // casquette
+    ctx.fillStyle = c.cheveux;
+    ctx.beginPath();
+    ctx.arc(2, -62, 10.5, Math.PI, 0);
+    ctx.fill();
+    ctx.fillRect(6, -63, 13, 4);
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.arc(7, -58, 1.8, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// Une pièce dorée qui tourne
+function dessinerPiece(p) {
+  const tour = Math.abs(Math.cos(Date.now() / 200 + p.x / 40));
+  ctx.fillStyle = "#ffd23f";
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
   ctx.beginPath();
-  ctx.arc(2, -62, 10.5, Math.PI, 0);
+  ctx.ellipse(p.x, p.y, Math.max(3, p.r * tour), p.r, 0, 0, Math.PI * 2);
   ctx.fill();
-  ctx.fillRect(6, -63, 13, 4);
-  // œil
-  ctx.fillStyle = "#000";
-  ctx.beginPath();
-  ctx.arc(7, -58, 1.8, 0, Math.PI * 2);
-  ctx.fill();
+  ctx.stroke();
 }
 
 function dessinerPersonnage() {
@@ -634,15 +1263,54 @@ function dessinerPersonnage() {
   ctx.ellipse(x, SOL + 4, 24 - ecart * 12, 5, 0, 0, Math.PI * 2);
   ctx.fill();
 
+  if (skinPerso === "zorok") {
+    // aura verte qui pulse autour de Zorok
+    const centreAura = joueur.glisse ? y - 14 : y - 40;
+    const rayon = 50 + Math.sin(Date.now() / 150) * 5;
+    const aura = ctx.createRadialGradient(x, centreAura, 8, x, centreAura, rayon);
+    aura.addColorStop(0, "rgba(80, 255, 110, 0.35)");
+    aura.addColorStop(1, "rgba(80, 255, 110, 0)");
+    ctx.fillStyle = aura;
+    ctx.beginPath();
+    ctx.arc(x, centreAura, rayon, 0, Math.PI * 2);
+    ctx.fill();
+  } else if (skinPerso === "ronaldo" && !enLair && !joueur.glisse) {
+    // un ballon de foot roule devant Ronaldo
+    const bx = x + 36;
+    const tour = Date.now() / 90;
+    ctx.fillStyle = "#fff";
+    ctx.strokeStyle = "#000";
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    ctx.arc(bx, SOL - 7, 7, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.stroke();
+    ctx.fillStyle = "#000";
+    ctx.beginPath();
+    ctx.arc(bx + Math.cos(tour) * 3, SOL - 7 + Math.sin(tour) * 3, 2.2, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
   if (vol > 0) dessinerJetpack(x - 25, y - 50, true);
 
   ctx.save();
   if (joueur.glisse) {
-    // allongé sur le dos, les pieds devant
-    ctx.translate(x, y - 16);
-    ctx.rotate(-1.45);
-    ctx.translate(0, 20);
-    dessinerCorps(0, false);
+    // roulade : il se met en boule et tourne vite, comme Sonic
+    const angle = (Date.now() / 45) % (Math.PI * 2);
+    ctx.translate(x, y - 15);
+    ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";   // lignes de vitesse derrière lui
+    ctx.lineWidth = 3;
+    ctx.lineCap = "round";
+    ctx.beginPath();
+    for (const dy of [-10, 0, 10]) {
+      ctx.moveTo(-22 - Math.random() * 6, dy);
+      ctx.lineTo(-40 - Math.random() * 14, dy);
+    }
+    ctx.stroke();
+    ctx.rotate(angle);
+    ctx.scale(0.4, 0.4);
+    ctx.translate(0, 38);
+    dessinerCorps(0, true);
   } else {
     ctx.translate(x, y);
     // il court moins vite quand le décor ralentit
@@ -680,6 +1348,21 @@ function sautPolice() {
 function dessinerPolice() {
   const px = 20;
   const saut = sautPolice();
+
+  // si on a équipé une voiture, c'est elle qui nous poursuit, à la place de la police
+  if (skinVoiture !== "normale") {
+    const voitureFuite = voiture;
+    const etaitCache = joueurCache;
+    voiture = { x: -5, vers: 1, roue: defilement / 11, vitesse: 0 };
+    joueurCache = false;
+    ctx.save();
+    ctx.translate(0, -saut);
+    dessinerVoitureFuite();
+    ctx.restore();
+    voiture = voitureFuite;
+    joueurCache = etaitCache;
+    return;
+  }
   const clignote = Math.floor(Date.now() / 150) % 2;
 
   // ombre
@@ -1078,7 +1761,7 @@ function dessinerPaysage(paysage) {
   ctx.fillStyle = paysage.nuage;
   const decalNuage = defilement * 0.1;
   const premierNuage = Math.floor(decalNuage / 260) - 1;
-  for (let k = premierNuage; k < premierNuage + 6; k++) {
+  for (let k = premierNuage; k < premierNuage + Math.ceil(canvas.width / 260) + 2; k++) {
     if (alea(k + 9000) < 0.3) continue;
     const nx = k * 260 - decalNuage + alea(k + 9100) * 150 + 100;
     const ny = 30 + alea(k + 9200) * 100;
@@ -1113,7 +1796,7 @@ function dessinerPaysage(paysage) {
   const decalVille = defilement * 0.2;
   const largeurCase = 90;
   const premiereCase = Math.floor(decalVille / largeurCase) - 1;
-  for (let i = premiereCase; i < premiereCase + 12; i++) {
+  for (let i = premiereCase; i < premiereCase + Math.ceil(canvas.width / largeurCase) + 2; i++) {
     {
       // chaque case a un bâtiment (ou une roche, un pin, une montagne) de taille inventée
       const b = { w: 40 + alea(i) * 40, h: 60 + alea(i + 1000) * 110 };
@@ -1196,7 +1879,7 @@ function dessinerPaysage(paysage) {
   const espace = 300;
   const decalPalmier = defilement * 0.5;
   const premierDecor = Math.floor(decalPalmier / espace) - 1;
-  for (let k = premierDecor; k < premierDecor + 5; k++) {
+  for (let k = premierDecor; k < premierDecor + Math.ceil(canvas.width / espace) + 2; k++) {
     if (alea(k + 5000) < 0.25) continue;  // parfois il n'y a rien
     const x = k * espace - decalPalmier + alea(k + 7000) * 150;
     if (paysage.decor === "palmier") dessinerPalmier(x + 100);
@@ -1262,7 +1945,7 @@ function dessinerPaysage(paysage) {
 }
 
 function ecrireTexte(texte, x, y, taille, trait) {
-  ctx.font = taille + "px " + POLICE;
+  ctx.font = "bold " + taille + "px " + POLICE;
   ctx.lineJoin = "round";
   ctx.strokeStyle = "#fff";
   ctx.lineWidth = trait;
@@ -1271,170 +1954,20 @@ function ecrireTexte(texte, x, y, taille, trait) {
   ctx.fillText(texte, x, y);
 }
 
-// Grosse tête de dessin animé dont les mains font « six seven » (une monte, l'autre descend)
-function dessinerGrosseTete() {
-  const t = Date.now();
-  const duree = t - debutPerdu;
-  const p = Math.sin(t / 130);  // -1 à 1 : le rythme des mains
-
-  // la tête arrive en rebondissant (de petite à grosse)
-  const x = Math.min(1, duree / 350) - 1;
-  const rebond = 1 + 2.70158 * x * x * x + 1.70158 * x * x;
-  const echelle = (0.2 + 0.8 * rebond) * (1 + 0.03 * Math.abs(p));
-
-  // fond sombre et rayons qui tournent
-  ctx.fillStyle = "rgba(0, 0, 0, 0.5)";
-  ctx.fillRect(0, 0, canvas.width, canvas.height);
-  ctx.save();
-  ctx.translate(400, 215);
-  ctx.rotate(t / 3000);
-  for (let i = 0; i < 16; i++) {
-    ctx.fillStyle = i % 2 ? "rgba(255, 210, 0, 0.22)" : "rgba(255, 70, 70, 0.18)";
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.arc(0, 0, 700, (i * Math.PI) / 8, ((i + 1) * Math.PI) / 8);
-    ctx.closePath();
-    ctx.fill();
-  }
-  ctx.restore();
-
-  ctx.save();
-  // petit tremblement au début
-  if (duree < 500) ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
-  ctx.translate(400, 215);
-  ctx.scale(echelle, echelle);
-  ctx.lineJoin = "round";
-  ctx.lineCap = "round";
-
-  // bras et mains : l'une monte pendant que l'autre descend, avec un 6 et un 7
-  [[-1, p * 45, "6"], [1, -p * 45, "7"]].forEach(([cote, dy, chiffre]) => {
-    const hx = cote * 175;
-    const hy = 20 + dy;
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 28;
-    ctx.beginPath();
-    ctx.moveTo(cote * 80, 120);
-    ctx.lineTo(hx, hy + 20);
-    ctx.stroke();
-    ctx.strokeStyle = "#d9a05a";
-    ctx.lineWidth = 22;
-    ctx.stroke();
-    // main : paume, doigts et pouce
-    ctx.fillStyle = "#e8b878";
-    ctx.strokeStyle = "#000";
-    ctx.lineWidth = 3;
-    ctx.beginPath();
-    ctx.arc(hx, hy, 34, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    for (let i = -1.5; i <= 1.5; i++) {
-      ctx.beginPath();
-      ctx.roundRect(hx + i * 15 - 7, hy - 62, 14, 34, 7);
-      ctx.fill();
-      ctx.stroke();
-    }
-    ctx.beginPath();
-    ctx.ellipse(hx - cote * 36, hy + 5, 10, 18, cote * 0.6, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.textAlign = "center";
-    ecrireTexte(chiffre, hx, hy + 14, 42, 6);
-  });
-
-  // oreilles et tête
+// Écran quand on se cogne : un message gentil, sans grosse tête
+function dessinerPerdu() {
+  const pulse = Math.sin(Date.now() / 200);
+  ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
+  ctx.beginPath();
+  ctx.roundRect(190, 100, 420, 200, 18);
+  ctx.fill();
   ctx.strokeStyle = "#000";
   ctx.lineWidth = 3;
-  ctx.fillStyle = "#e0a15f";
-  for (const dx of [-100, 100]) {
-    ctx.beginPath();
-    ctx.ellipse(dx, 0, 16, 26, 0, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-  }
-  const peau = ctx.createRadialGradient(-30, -50, 10, 0, 0, 110);
-  peau.addColorStop(0, "#f8d3a0");
-  peau.addColorStop(1, "#d9a05a");
-  ctx.fillStyle = peau;
-  ctx.beginPath();
-  ctx.arc(0, 0, 100, 0, Math.PI * 2);
-  ctx.fill();
   ctx.stroke();
-  // cheveux
-  ctx.fillStyle = "#2a1a10";
-  ctx.beginPath();
-  ctx.moveTo(-98, -25);
-  ctx.quadraticCurveTo(-110, -105, -45, -108);
-  ctx.quadraticCurveTo(0, -135, 45, -108);
-  ctx.quadraticCurveTo(110, -105, 98, -25);
-  ctx.quadraticCurveTo(60, -75, 0, -70);
-  ctx.quadraticCurveTo(-60, -75, -98, -25);
-  ctx.fill();
-  ctx.stroke();
-  // joues rouges
-  ctx.fillStyle = "rgba(255, 90, 90, 0.35)";
-  for (const dx of [-62, 62]) {
-    ctx.beginPath();
-    ctx.ellipse(dx, 25, 20, 12, 0, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // yeux qui suivent les mains
-  for (const dx of [-37, 37]) {
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.arc(dx, -22, 25, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.stroke();
-    ctx.fillStyle = "#000";
-    ctx.beginPath();
-    ctx.arc(dx + p * 8, -20, 11, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#fff";
-    ctx.beginPath();
-    ctx.arc(dx + p * 8 - 3, -24, 3.5, 0, Math.PI * 2);
-    ctx.fill();
-  }
-  // sourcils levés
-  ctx.strokeStyle = "#2a1a10";
-  ctx.lineWidth = 7;
-  ctx.beginPath();
-  ctx.moveTo(-65, -62);
-  ctx.quadraticCurveTo(-40, -78, -15, -60);
-  ctx.moveTo(65, -62);
-  ctx.quadraticCurveTo(40, -78, 15, -60);
-  ctx.stroke();
-  // bouche qui crie, avec dents et langue
-  const ouverture = 24 + Math.abs(p) * 16;
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = 3;
-  ctx.fillStyle = "#5a0d0d";
-  ctx.beginPath();
-  ctx.ellipse(0, 48, 42, ouverture, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.stroke();
-  ctx.save();
-  ctx.beginPath();
-  ctx.ellipse(0, 48, 42, ouverture, 0, 0, Math.PI * 2);
-  ctx.clip();
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(-30, 48 - ouverture, 60, 12);
-  ctx.fillStyle = "#e0566b";
-  ctx.beginPath();
-  ctx.ellipse(0, 48 + ouverture * 0.7, 26, ouverture * 0.5, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-  // goutte de sueur
-  ctx.fillStyle = "#7fd0ff";
-  const goutte = (t / 12) % 50;
-  ctx.beginPath();
-  ctx.ellipse(80, -60 + goutte, 6, 9, 0, 0, Math.PI * 2);
-  ctx.fill();
-  ctx.restore();
-
-  // textes qui pulsent
   ctx.textAlign = "center";
-  ecrireTexte("Attrapé !", 400, 55, 40, 6);
-  ecrireTexte("SIX SEVEN !", 400, 358, 42 + Math.abs(p) * 8, 7);
-  ecrireTexte("Appuie sur Espace pour rejouer", 400, 392, 20, 4);
+  ecrireTexte("Perdu !", 400, 180, 64 + pulse * 4, 8);
+  ecrireTexte("Dommage, retente ta chance !", 400, 230, 26, 5);
+  if (!deuxJoueurs) ecrireTexte("Appuie sur Espace pour rejouer", 400, 275, 22, 4);
 }
 
 function dessiner() {
@@ -1444,11 +1977,25 @@ function dessiner() {
 
   dessinerPolice();
   for (const obj of objets) dessinerObjet(obj);
+  for (const p of pieces) dessinerPiece(p);
+  for (const e of etincelles) {
+    ctx.globalAlpha = e.vie / 20;
+    ctx.fillStyle = "#ffd23f";
+    ctx.beginPath();
+    ctx.arc(e.x, e.y, 3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
   for (const o of obstacles) dessinerObstacle(o);
   dessinerVoitureFuite();
   dessinerPersonnage();
 
+  // les écrans de fin sont dessinés pour une toile de 800 : on les recentre si la toile est plus large
+  const decalageCentre = (canvas.width - 800) / 2;
+  ctx.save();
+  ctx.translate(decalageCentre, 0);
   if (etat === "gagne") dessinerVictoire();
+  ctx.restore();
 
   if (annonce > 0) {
     annonce--;
@@ -1466,7 +2013,10 @@ function dessiner() {
     }
   }
 
-  if (etat === "perdu") dessinerGrosseTete();
+  ctx.save();
+  ctx.translate(decalageCentre, 0);
+  if (etat === "perdu") dessinerPerdu();
+  ctx.restore();
 
   if (etat === "attente") {
     ctx.fillStyle = "rgba(255, 255, 255, 0.55)";
@@ -1482,6 +2032,411 @@ function dessiner() {
   }
 }
 
+// ---------- Les voitures de fuite : une par skin ----------
+// On dessine toujours une voiture de 120 de large, avec l'arrière à gauche (x = 0).
+
+function dessinerRoueVoiture(wx, wy, r) {
+  ctx.fillStyle = "#111";
+  ctx.beginPath();
+  ctx.arc(wx, wy, r, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.fillStyle = "#d4d4dc";                            // jante
+  ctx.beginPath();
+  ctx.arc(wx, wy, r * 0.62, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#6b6b78";
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 5; i++) {
+    const a = voiture.roue + (i * Math.PI * 2) / 5;     // les branches tournent
+    ctx.beginPath();
+    ctx.moveTo(wx, wy);
+    ctx.lineTo(wx + Math.cos(a) * r * 0.6, wy + Math.sin(a) * r * 0.6);
+    ctx.stroke();
+  }
+  ctx.fillStyle = "#333";
+  ctx.beginPath();
+  ctx.arc(wx, wy, r * 0.18, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Le garçon assis dans la voiture : on voit sa tête et sa casquette (ou son masque)
+function dessinerPassager(x, y) {
+  const c = COULEURS_PERSO[skinPerso];
+  ctx.fillStyle = c.peau;
+  ctx.beginPath();
+  ctx.arc(x, y, 9, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+  ctx.fillStyle = c.cheveux;
+  ctx.beginPath();
+  ctx.arc(x, y - 2, 9.5, Math.PI, 0);
+  ctx.fill();
+  if (c.visiere) ctx.fillRect(x + 2, y - 3, 11, 3);
+  ctx.fillStyle = skinPerso === "spiderman" ? "#fff" : "#000";
+  ctx.beginPath();
+  ctx.arc(x + 5, y, skinPerso === "spiderman" ? 2.6 : 1.8, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+function degradeVoiture(haut, bas, couleurs) {
+  const d = ctx.createLinearGradient(0, haut, 0, bas);
+  d.addColorStop(0, couleurs[0]);
+  d.addColorStop(1, couleurs[1]);
+  return d;
+}
+
+function dessinerPhareAvant(x, y) {
+  const lueur = ctx.createRadialGradient(x, y, 1, x, y, 16);
+  lueur.addColorStop(0, "rgba(255, 240, 160, 0.8)");
+  lueur.addColorStop(1, "rgba(255, 240, 160, 0)");
+  ctx.fillStyle = lueur;
+  ctx.fillRect(x - 16, y - 16, 32, 32);
+  ctx.fillStyle = "#fff6c0";
+  ctx.fillRect(x - 3, y - 3, 6, 6);
+}
+
+// Voiture de sport rouge : spoiler, bandes de course, vitres brillantes
+function dessinerVoitureSport(couleurs) {
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  // spoiler arrière
+  ctx.fillStyle = "#222";
+  ctx.fillRect(2, SOL - 52, 4, 14);
+  ctx.fillRect(-4, SOL - 54, 22, 4);
+  // carrosserie basse et allongée
+  ctx.fillStyle = degradeVoiture(SOL - 42, SOL - 10, couleurs);
+  ctx.beginPath();
+  ctx.moveTo(0, SOL - 14);
+  ctx.lineTo(0, SOL - 32);
+  ctx.quadraticCurveTo(2, SOL - 40, 14, SOL - 40);
+  ctx.lineTo(96, SOL - 38);
+  ctx.quadraticCurveTo(122, SOL - 32, 122, SOL - 20);
+  ctx.lineTo(122, SOL - 14);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // cabine
+  ctx.beginPath();
+  ctx.moveTo(26, SOL - 40);
+  ctx.quadraticCurveTo(38, SOL - 66, 56, SOL - 66);
+  ctx.lineTo(76, SOL - 66);
+  ctx.quadraticCurveTo(92, SOL - 60, 102, SOL - 39);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // vitres
+  ctx.fillStyle = "#9fd8f5";
+  ctx.beginPath();
+  ctx.moveTo(34, SOL - 41);
+  ctx.quadraticCurveTo(42, SOL - 60, 56, SOL - 60);
+  ctx.lineTo(74, SOL - 60);
+  ctx.quadraticCurveTo(86, SOL - 56, 93, SOL - 41);
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";         // reflet
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  ctx.moveTo(46, SOL - 56);
+  ctx.lineTo(40, SOL - 43);
+  ctx.moveTo(56, SOL - 57);
+  ctx.lineTo(50, SOL - 43);
+  ctx.stroke();
+  if (joueurCache) dessinerPassager(68, SOL - 51);
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  // montant de porte, poignée et bandes de course
+  ctx.beginPath();
+  ctx.moveTo(62, SOL - 40);
+  ctx.lineTo(62, SOL - 16);
+  ctx.stroke();
+  ctx.fillStyle = "#222";
+  ctx.fillRect(52, SOL - 35, 8, 3);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(4, SOL - 28, 114, 3);
+  ctx.fillStyle = "#222";
+  ctx.fillRect(4, SOL - 24, 114, 2);
+  // reflet sur le capot
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.45)";
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(10, SOL - 37);
+  ctx.lineTo(92, SOL - 36);
+  ctx.stroke();
+  // pare-chocs, phares
+  ctx.fillStyle = "#333";
+  ctx.fillRect(0, SOL - 15, 122, 5);
+  ctx.fillStyle = "#ff2a2a";
+  ctx.fillRect(0, SOL - 32, 5, 8);
+  dessinerPhareAvant(119, SOL - 26);
+  // roues dans leurs passages
+  for (const wx of [28, 92]) {
+    ctx.fillStyle = "#1a1a20";
+    ctx.beginPath();
+    ctx.arc(wx, SOL - 10, 15, Math.PI, 0);
+    ctx.fill();
+    dessinerRoueVoiture(wx, SOL - 10, 12);
+  }
+}
+
+// Taxi jaune : damier, enseigne sur le toit, vitres larges
+function dessinerTaxi(couleurs) {
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  ctx.fillStyle = degradeVoiture(SOL - 42, SOL - 10, couleurs);
+  ctx.beginPath();
+  ctx.roundRect(0, SOL - 40, 120, 30, 8);
+  ctx.fill();
+  ctx.stroke();
+  // cabine haute (comme un vrai taxi)
+  ctx.beginPath();
+  ctx.moveTo(22, SOL - 40);
+  ctx.lineTo(32, SOL - 66);
+  ctx.lineTo(88, SOL - 66);
+  ctx.lineTo(104, SOL - 40);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = "#b8e6fa";
+  ctx.beginPath();
+  ctx.moveTo(30, SOL - 42);
+  ctx.lineTo(38, SOL - 61);
+  ctx.lineTo(60, SOL - 61);
+  ctx.lineTo(60, SOL - 42);
+  ctx.closePath();
+  ctx.moveTo(65, SOL - 42);
+  ctx.lineTo(65, SOL - 61);
+  ctx.lineTo(86, SOL - 61);
+  ctx.lineTo(97, SOL - 42);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  if (joueurCache) dessinerPassager(48, SOL - 52);
+  // damier noir et blanc sur le côté
+  for (let i = 0; i < 20; i++) {
+    for (let j = 0; j < 2; j++) {
+      ctx.fillStyle = (i + j) % 2 ? "#000" : "#fff";
+      ctx.fillRect(4 + i * 5.6, SOL - 27 + j * 5, 5.6, 5);
+    }
+  }
+  ctx.strokeRect(4, SOL - 27, 112, 10);
+  // enseigne lumineuse sur le toit
+  ctx.fillStyle = "#fffbe0";
+  ctx.beginPath();
+  ctx.roundRect(48, SOL - 77, 30, 11, 3);
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.translate(63, SOL - 68);
+  if (voiture.vers < 0) ctx.scale(-1, 1);               // le texte ne doit pas être à l'envers
+  ctx.fillStyle = "#000";
+  ctx.font = "bold 9px Impact, sans-serif";
+  ctx.textAlign = "center";
+  ctx.fillText("TAXI", 0, 0);
+  ctx.restore();
+  // pare-chocs chromés, phares
+  ctx.fillStyle = "#d4d4dc";
+  ctx.fillRect(0, SOL - 16, 120, 5);
+  ctx.fillStyle = "#ff2a2a";
+  ctx.fillRect(0, SOL - 36, 5, 8);
+  dessinerPhareAvant(117, SOL - 30);
+  for (const wx of [28, 92]) {
+    ctx.fillStyle = "#1a1a20";
+    ctx.beginPath();
+    ctx.arc(wx, SOL - 10, 15, Math.PI, 0);
+    ctx.fill();
+    dessinerRoueVoiture(wx, SOL - 10, 12);
+  }
+}
+
+// Tank militaire : chenilles, camouflage, tourelle, long canon
+function dessinerTank(couleurs) {
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  // coque camouflée
+  ctx.fillStyle = degradeVoiture(SOL - 42, SOL - 18, couleurs);
+  ctx.beginPath();
+  ctx.moveTo(6, SOL - 18);
+  ctx.lineTo(0, SOL - 36);
+  ctx.lineTo(96, SOL - 40);
+  ctx.lineTo(124, SOL - 26);
+  ctx.lineTo(120, SOL - 18);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  ctx.save();
+  ctx.clip();
+  ctx.fillStyle = "rgba(30, 40, 10, 0.55)";
+  for (const [tx, ty, tr] of [[20, SOL - 30, 10], [52, SOL - 24, 8], [84, SOL - 33, 11], [108, SOL - 24, 7]]) {
+    ctx.beginPath();
+    ctx.ellipse(tx, ty, tr * 1.5, tr * 0.7, 0.3, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.restore();
+  // étoile blanche sur la coque
+  ctx.fillStyle = "#e8e8d0";
+  ctx.beginPath();
+  for (let i = 0; i < 10; i++) {
+    const r = i % 2 ? 3 : 7;
+    const a = -Math.PI / 2 + (i * Math.PI) / 5;
+    ctx.lineTo(100 + Math.cos(a) * r, SOL - 28 + Math.sin(a) * r);
+  }
+  ctx.closePath();
+  ctx.fill();
+  // canon avec frein de bouche
+  ctx.fillStyle = "#3a4420";
+  ctx.fillRect(84, SOL - 63, 50, 7);
+  ctx.strokeRect(84, SOL - 63, 50, 7);
+  ctx.fillRect(130, SOL - 66, 8, 13);
+  ctx.strokeRect(130, SOL - 66, 8, 13);
+  // tourelle
+  ctx.fillStyle = degradeVoiture(SOL - 76, SOL - 44, couleurs);
+  ctx.beginPath();
+  ctx.moveTo(30, SOL - 40);
+  ctx.lineTo(36, SOL - 70);
+  ctx.lineTo(78, SOL - 70);
+  ctx.lineTo(92, SOL - 54);
+  ctx.lineTo(90, SOL - 40);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // trappe ouverte avec le garçon dedans
+  ctx.fillStyle = "#222";
+  ctx.beginPath();
+  ctx.ellipse(54, SOL - 70, 10, 3, 0, 0, Math.PI * 2);
+  ctx.fill();
+  if (joueurCache) dessinerPassager(54, SOL - 76);
+  // chenilles avec leurs roues
+  ctx.fillStyle = "#26262c";
+  ctx.beginPath();
+  ctx.roundRect(-4, SOL - 22, 130, 22, 11);
+  ctx.fill();
+  ctx.stroke();
+  for (let i = 0; i < 5; i++) {
+    const wx = 10 + i * 26;
+    ctx.fillStyle = "#555";
+    ctx.beginPath();
+    ctx.arc(wx, SOL - 11, 8, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.strokeStyle = "#999";
+    ctx.lineWidth = 2;
+    const a = voiture.roue + i;
+    ctx.beginPath();
+    ctx.moveTo(wx - Math.cos(a) * 6, SOL - 11 - Math.sin(a) * 6);
+    ctx.lineTo(wx + Math.cos(a) * 6, SOL - 11 + Math.sin(a) * 6);
+    ctx.stroke();
+  }
+}
+
+// Voiture volante futuriste : dôme en verre, ailes, réacteurs et lueur sous la voiture
+function dessinerVoitureVolante(couleurs) {
+  const t = Date.now();
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  // lueur bleue sous la voiture
+  const lueur = ctx.createRadialGradient(60, SOL - 8, 4, 60, SOL - 8, 70);
+  lueur.addColorStop(0, "rgba(90, 220, 255, 0.55)");
+  lueur.addColorStop(1, "rgba(90, 220, 255, 0)");
+  ctx.fillStyle = lueur;
+  ctx.fillRect(-10, SOL - 50, 140, 70);
+  // flamme du réacteur arrière
+  ctx.fillStyle = "#ff9a00";
+  ctx.beginPath();
+  ctx.moveTo(2, SOL - 30);
+  ctx.lineTo(-18 - Math.random() * 14, SOL - 24);
+  ctx.lineTo(2, SOL - 18);
+  ctx.fill();
+  ctx.fillStyle = "#ffe14d";
+  ctx.beginPath();
+  ctx.moveTo(2, SOL - 27);
+  ctx.lineTo(-8 - Math.random() * 8, SOL - 24);
+  ctx.lineTo(2, SOL - 21);
+  ctx.fill();
+  // aile du fond
+  ctx.fillStyle = "#cfe3ff";
+  ctx.beginPath();
+  ctx.moveTo(34, SOL - 38);
+  ctx.lineTo(8, SOL - 68);
+  ctx.lineTo(18, SOL - 68);
+  ctx.lineTo(62, SOL - 38);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // coque aérodynamique
+  ctx.fillStyle = degradeVoiture(SOL - 46, SOL - 12, couleurs);
+  ctx.beginPath();
+  ctx.moveTo(0, SOL - 22);
+  ctx.quadraticCurveTo(0, SOL - 40, 22, SOL - 42);
+  ctx.lineTo(92, SOL - 40);
+  ctx.quadraticCurveTo(126, SOL - 32, 124, SOL - 22);
+  ctx.quadraticCurveTo(122, SOL - 12, 100, SOL - 12);
+  ctx.lineTo(18, SOL - 12);
+  ctx.quadraticCurveTo(0, SOL - 12, 0, SOL - 22);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // dôme en verre
+  const verre = ctx.createLinearGradient(0, SOL - 70, 0, SOL - 40);
+  verre.addColorStop(0, "rgba(220, 245, 255, 0.95)");
+  verre.addColorStop(1, "rgba(120, 190, 240, 0.85)");
+  ctx.fillStyle = verre;
+  ctx.beginPath();
+  ctx.moveTo(34, SOL - 41);
+  ctx.quadraticCurveTo(44, SOL - 74, 68, SOL - 72);
+  ctx.quadraticCurveTo(88, SOL - 70, 98, SOL - 40);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  if (joueurCache) dessinerPassager(66, SOL - 56);
+  ctx.strokeStyle = "rgba(255, 255, 255, 0.9)";         // reflet du dôme
+  ctx.lineWidth = 3;
+  ctx.beginPath();
+  ctx.moveTo(46, SOL - 58);
+  ctx.quadraticCurveTo(52, SOL - 68, 62, SOL - 68);
+  ctx.stroke();
+  // lumières néon sur le côté
+  ctx.fillStyle = "#4ff0ff";
+  ctx.fillRect(14, SOL - 26, 90, 3);
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(14, SOL - 26, 90, 1);
+  // aile de devant
+  ctx.strokeStyle = "#000";
+  ctx.lineWidth = 2;
+  ctx.fillStyle = "#fff";
+  ctx.beginPath();
+  ctx.moveTo(40, SOL - 30);
+  ctx.lineTo(12, SOL - 60);
+  ctx.lineTo(24, SOL - 60);
+  ctx.lineTo(72, SOL - 30);
+  ctx.closePath();
+  ctx.fill();
+  ctx.stroke();
+  // phare et feu clignotant
+  dessinerPhareAvant(118, SOL - 26);
+  ctx.fillStyle = Math.floor(t / 250) % 2 ? "#ff2a2a" : "#7a1010";
+  ctx.beginPath();
+  ctx.arc(14, SOL - 62, 3, 0, Math.PI * 2);
+  ctx.fill();
+  // deux réacteurs sous la voiture, avec de petites flammes
+  for (const wx of [32, 92]) {
+    ctx.fillStyle = "#333";
+    ctx.fillRect(wx - 7, SOL - 13, 14, 5);
+    ctx.fillStyle = "#4ff0ff";
+    ctx.beginPath();
+    ctx.moveTo(wx - 6, SOL - 8);
+    ctx.lineTo(wx, SOL + 4 + Math.random() * 10);
+    ctx.lineTo(wx + 6, SOL - 8);
+    ctx.fill();
+    ctx.fillStyle = "#fff";
+    ctx.beginPath();
+    ctx.moveTo(wx - 3, SOL - 8);
+    ctx.lineTo(wx, SOL - 2 + Math.random() * 5);
+    ctx.lineTo(wx + 3, SOL - 8);
+    ctx.fill();
+  }
+}
+
 function dessinerVoitureFuite() {
   if (!voiture) return;
   ctx.save();
@@ -1491,73 +2446,21 @@ function dessinerVoitureFuite() {
   } else {
     ctx.translate(voiture.x, 0);
   }
-  // ombre
-  ctx.fillStyle = "rgba(0, 0, 0, 0.35)";
+  // ombre sur la route (plus petite et plus claire quand la voiture vole)
+  ctx.fillStyle = "rgba(0, 0, 0, " + (skinVoiture === "volante" ? 0.2 : 0.35) + ")";
   ctx.beginPath();
-  ctx.ellipse(60, SOL + 4, 58, 5, 0, 0, Math.PI * 2);
+  ctx.ellipse(60, SOL + 4, skinVoiture === "volante" ? 42 : 58, 5, 0, 0, Math.PI * 2);
   ctx.fill();
-  // carrosserie rouge
-  const corps = ctx.createLinearGradient(0, SOL - 40, 0, SOL - 10);
-  corps.addColorStop(0, "#ff4a4a");
-  corps.addColorStop(1, "#a50f0f");
-  ctx.fillStyle = corps;
-  ctx.strokeStyle = "#000";
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  ctx.roundRect(0, SOL - 38, 120, 28, 9);
-  ctx.fill();
-  ctx.stroke();
-  // cabine et vitres
-  ctx.beginPath();
-  ctx.moveTo(30, SOL - 38);
-  ctx.lineTo(44, SOL - 64);
-  ctx.lineTo(86, SOL - 64);
-  ctx.lineTo(104, SOL - 38);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-  ctx.fillStyle = "#9fd8f5";
-  ctx.beginPath();
-  ctx.moveTo(38, SOL - 40);
-  ctx.lineTo(49, SOL - 59);
-  ctx.lineTo(84, SOL - 59);
-  ctx.lineTo(97, SOL - 40);
-  ctx.closePath();
-  ctx.fill();
-  // le garçon assis dans la voiture
-  if (joueurCache) {
-    ctx.fillStyle = "#e0ac69";
-    ctx.beginPath();
-    ctx.arc(70, SOL - 50, 9, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillStyle = "#111";
-    ctx.beginPath();
-    ctx.arc(70, SOL - 52, 9.5, Math.PI, 0);
-    ctx.fill();
-    ctx.fillRect(72, SOL - 53, 11, 3);
-  }
-  // bande blanche, phare et feu arrière
-  ctx.fillStyle = "#fff";
-  ctx.fillRect(8, SOL - 24, 104, 3);
-  ctx.fillStyle = "#ffe98a";
-  ctx.fillRect(114, SOL - 32, 6, 7);
-  ctx.fillStyle = "#ff2a2a";
-  ctx.fillRect(0, SOL - 32, 5, 7);
-  // roues qui tournent
-  for (const wx of [28, 92]) {
-    ctx.fillStyle = "#111";
-    ctx.beginPath();
-    ctx.arc(wx, SOL - 8, 11, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.strokeStyle = "#bbb";
-    ctx.lineWidth = 2;
-    for (let i = 0; i < 3; i++) {
-      const a = voiture.roue + (i * Math.PI) / 3;
-      ctx.beginPath();
-      ctx.moveTo(wx - Math.cos(a) * 7, SOL - 8 - Math.sin(a) * 7);
-      ctx.lineTo(wx + Math.cos(a) * 7, SOL - 8 + Math.sin(a) * 7);
-      ctx.stroke();
-    }
+  const couleurs = COULEURS_VOITURE[skinVoiture];
+  if (skinVoiture === "taxi") {
+    dessinerTaxi(couleurs);
+  } else if (skinVoiture === "tank") {
+    dessinerTank(couleurs);
+  } else if (skinVoiture === "volante") {
+    ctx.translate(0, -26 + Math.sin(Date.now() / 150) * 4);   // elle flotte au-dessus de la route
+    dessinerVoitureVolante(couleurs);
+  } else {
+    dessinerVoitureSport(couleurs);
   }
   ctx.restore();
 }
@@ -1583,7 +2486,7 @@ function dessinerVictoire() {
   ecrireTexte("Bravo !", 400, 140, 64, 8);
   ecrireTexte("Tu as échappé à la police !", 400, 195, 30, 5);
   ecrireTexte("Distance : " + DISTANCE_FIN + " m", 400, 240, 26, 5);
-  ecrireTexte("Appuie sur Espace pour rejouer", 400, 300, 24, 5);
+  if (!deuxJoueurs) ecrireTexte("Appuie sur Espace pour rejouer", 400, 300, 24, 5);
 }
 
 // Oiseaux gentils : ils volent dans le ciel et ne font aucun mal
@@ -1619,8 +2522,12 @@ function dessinerOiseaux() {
 
 function boucle() {
   mettreAJourOiseaux();
-  mettreAJour();
-  dessiner();
+  if (deuxJoueurs) {
+    boucleDeuxJoueurs();
+  } else {
+    mettreAJour();
+    dessiner();
+  }
   requestAnimationFrame(boucle);
 }
 

@@ -7,13 +7,41 @@
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+  <div id="accueil">
+    <span class="palmier gauche">🌴</span>
+    <span class="palmier droite">🌴</span>
+    <h2 class="titre-accueil">Cours et Esquive</h2>
+    <p class="lieu">Los Angeles</p>
+    <p class="pieces-accueil">🪙 <span id="piecesAccueil">0</span> pièces</p>
+    <div class="scene">
+      <section class="boutique">
+        <h3>Boutique voitures</h3>
+        <div id="listeVoitures"></div>
+      </section>
+      <div class="centre">
+        <button id="btnStart">START</button>
+        <button id="btn2Joueurs">2 JOUEURS</button>
+      </div>
+      <section class="boutique">
+        <h3>Boutique personnages</h3>
+        <div id="listePersos"></div>
+      </section>
+    </div>
+    <p id="messageBoutique"></p>
+    <section class="boutique tableau-scores">
+      <h3>🏆 Meilleurs scores</h3>
+      <div id="listeScores"></div>
+    </section>
+  </div>
   <h1>Cours et Esquive</h1>
-  <p class="score">Distance : <span id="score">0</span> m &nbsp; Record : <span id="record">0</span> m</p>
+  <p class="score">Distance : <span id="score">0</span> m &nbsp; Record : <span id="record">0</span> m &nbsp; Pièces : <span id="pieces">0</span></p>
   <canvas id="jeu" width="800" height="400"></canvas>
-  <p class="aide">Espace = sauter &nbsp;&nbsp; Flèche du bas = glisser</p>
+  <canvas id="jeu2" width="800" height="400" hidden></canvas>
+  <p class="aide" id="aide">Espace = sauter &nbsp;&nbsp; Flèche du bas = roulade</p>
   <div class="boutons">
     <button id="btnSaut">Sauter</button>
-    <button id="btnGlisse">Glisser</button>
+    <button id="btnGlisse">Roulade</button>
+    <button id="btnAccueil">Accueil</button>
   </div>
   <script src="script.js"></script>
 </body>

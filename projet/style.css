@@ -52,3 +52,406 @@ button:active {
   transform: translate(2px, 2px);
   box-shadow: 1px 1px 0 #000;
 }
+
+/* ---------- Page d'accueil : Los Angeles ---------- */
+#accueil {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 50% 62%, #ffe27a 0, #ff9a4d 90px, rgba(255, 122, 61, 0) 260px),
+    linear-gradient(to bottom, #0a1a4a, #8a44b8 45%, #ff7a3d 85%, #ffd86b);
+}
+
+/* les immeubles de la ville, en bas de l'écran */
+#accueil::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 200px;
+  background:
+    linear-gradient(#1c2a55, #1c2a55) 3% 100% / 70px 120px no-repeat,
+    linear-gradient(#141f45, #141f45) 10% 100% / 60px 170px no-repeat,
+    linear-gradient(#1c2a55, #1c2a55) 18% 100% / 80px 100px no-repeat,
+    linear-gradient(#141f45, #141f45) 28% 100% / 55px 150px no-repeat,
+    linear-gradient(#1c2a55, #1c2a55) 40% 100% / 90px 90px no-repeat,
+    linear-gradient(#141f45, #141f45) 55% 100% / 60px 160px no-repeat,
+    linear-gradient(#1c2a55, #1c2a55) 66% 100% / 80px 110px no-repeat,
+    linear-gradient(#141f45, #141f45) 78% 100% / 65px 175px no-repeat,
+    linear-gradient(#1c2a55, #1c2a55) 88% 100% / 75px 120px no-repeat,
+    linear-gradient(#141f45, #141f45) 97% 100% / 60px 150px no-repeat;
+  pointer-events: none;
+}
+
+#accueil.cache {
+  display: none;
+}
+
+.palmier {
+  position: absolute;
+  bottom: 0;
+  font-size: 9rem;
+  pointer-events: none;
+}
+
+.palmier.gauche { left: 1%; }
+.palmier.droite { right: 1%; }
+
+.titre-accueil {
+  position: relative;
+  z-index: 1;
+  margin: 0;
+  font-size: 3.5rem;
+  transform: rotate(-2deg);
+  letter-spacing: 3px;
+  color: #000;
+  text-shadow: 3px 3px 0 #fff, -1px -1px 0 #fff;
+}
+
+.lieu, .pieces-accueil {
+  position: relative;
+  z-index: 1;
+  margin: 4px;
+  font-size: 1.6rem;
+  color: #000;
+  text-shadow: 2px 2px 0 #fff;
+}
+
+.scene {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  gap: 20px;
+  width: 95%;
+  max-width: 1000px;
+  margin-top: 10px;
+}
+
+.boutique {
+  background: rgba(255, 255, 255, 0.8);
+  border: 3px solid #000;
+  border-radius: 12px;
+  padding: 10px;
+  box-shadow: 4px 4px 0 #000;
+}
+
+.boutique h3 {
+  margin: 0 0 8px;
+  text-align: center;
+  font-size: 1.3rem;
+}
+
+.boutique button {
+  display: block;
+  width: 100%;
+  margin-bottom: 8px;
+  font-size: 1.1rem;
+  padding: 8px 10px;
+}
+
+.boutique button.possede { background: #c8f7c5; }
+.boutique button.choisi { background: #ffd23f; }
+
+#btnStart {
+  font-size: 3rem;
+  padding: 25px 50px;
+  background: #ffd23f;
+  box-shadow: 6px 6px 0 #000;
+}
+
+#messageBoutique {
+  position: relative;
+  z-index: 1;
+  min-height: 1.6rem;
+  margin: 10px;
+  font-size: 1.3rem;
+  color: #000;
+  text-shadow: 2px 2px 0 #fff;
+}
+
+.tableau-scores {
+  position: relative;
+  z-index: 1;
+  min-width: 220px;
+  text-align: center;
+  font-size: 1.2rem;
+}
+
+/* ---------- Mode 2 joueurs : écran partagé en deux ---------- */
+.centre {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+}
+
+#btn2Joueurs {
+  font-size: 1.6rem;
+  padding: 12px 30px;
+  background: #7dff6b;
+}
+
+canvas[hidden] {
+  display: none;
+}
+
+body.deux h1,
+body.deux .score,
+body.deux #btnSaut,
+body.deux #btnGlisse {
+  display: none;
+}
+
+body.deux canvas {
+  height: 40vh;
+  width: auto;
+  max-width: 95%;
+  margin-top: 6px;
+}
+
+/* Écrans du mode 2 joueurs : on prend presque toute la hauteur de la fenêtre */
+body.deux canvas {
+  height: calc((100vh - 80px) / 2);
+  max-width: 100%;
+  object-fit: contain;
+  margin-top: 4px;
+  border-width: 3px;
+}
+
+body.deux .aide {
+  font-size: 1rem;
+  margin: 2px;
+}
+
+body.deux .boutons {
+  margin-top: 2px;
+}
+
+body.deux .boutons button {
+  font-size: 1rem;
+  padding: 3px 14px;
+}
+
+/* Mode 1 joueur : le jeu prend toute la hauteur de la fenêtre (plein écran) */
+body:not(.deux) canvas {
+  height: calc(100vh - 150px);
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
+}
+
+/* Mode 2 joueurs : deux bandes pleine largeur, l'écran est coupé en deux à l'horizontale */
+body.deux canvas {
+  width: 100vw;
+  max-width: none;
+  margin: 0;
+  border-radius: 0;
+  border-left: 0;
+  border-right: 0;
+}
+
+/* Aperçu des skins dans les boutiques */
+.boutique button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-align: left;
+}
+
+#accueil .boutique canvas {
+  height: 70px;
+  width: auto;
+  max-width: none;
+  border: 0;
+  border-radius: 0;
+  margin: 0;
+  flex-shrink: 0;
+}
+
+/* ---------- Nouveau look : couleurs vives, gros contours, cartes brillantes ---------- */
+body, button, #accueil {
+  font-family: Impact, Haettenschweiler, "Arial Black", sans-serif;
+  letter-spacing: 1px;
+}
+
+/* le jeu : couleurs plus vives et cadre lumineux */
+#jeu, #jeu2 {
+  filter: saturate(1.3) contrast(1.05);
+  border-color: #fff;
+  box-shadow: 0 0 0 4px #000, 0 0 25px rgba(90, 200, 255, 0.8);
+}
+
+h1 {
+  font-style: italic;
+  text-transform: uppercase;
+  color: #ffe600;
+  text-shadow: 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 6px 0 #1b2a8a;
+}
+
+/* compteurs en forme de pastille */
+.score, .aide {
+  background: rgba(10, 15, 50, 0.85);
+  color: #fff;
+  text-shadow: none;
+  border: 2px solid #5ad2ff;
+  border-radius: 20px;
+  padding: 4px 18px;
+  font-style: italic;
+}
+
+/* boutons : jaune brillant, penchés, avec une ombre épaisse */
+button {
+  background: linear-gradient(#fff36a, #ffc400);
+  border: 3px solid #000;
+  box-shadow: 0 5px 0 #8a5a00;
+  font-style: italic;
+  text-transform: uppercase;
+  transform: skewX(-6deg);
+  transition: transform 0.1s;
+}
+
+button:hover {
+  transform: skewX(-6deg) scale(1.05);
+}
+
+button:active {
+  transform: skewX(-6deg) translateY(4px);
+  box-shadow: 0 1px 0 #8a5a00;
+}
+
+/* page d'accueil */
+#accueil {
+  background:
+    repeating-linear-gradient(115deg, rgba(255, 255, 255, 0.05) 0 40px, rgba(255, 255, 255, 0) 40px 80px),
+    radial-gradient(circle at 50% 62%, #fff2a0 0, #ff9a4d 90px, rgba(255, 122, 61, 0) 280px),
+    linear-gradient(to bottom, #0b1f8a, #7a35d6 45%, #ff5fa2 82%, #ffd86b);
+}
+
+.titre-accueil {
+  font-size: 4.5rem;
+  font-style: italic;
+  text-transform: uppercase;
+  color: #ffe600;
+  text-shadow: 4px 4px 0 #000, -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 0 9px 0 #1b2a8a;
+}
+
+.lieu {
+  font-style: italic;
+  text-transform: uppercase;
+  color: #fff;
+  text-shadow: 2px 2px 0 #000, -1px -1px 0 #000;
+}
+
+.pieces-accueil {
+  background: rgba(10, 15, 50, 0.85);
+  color: #ffe600;
+  text-shadow: none;
+  border: 2px solid #ffe600;
+  border-radius: 22px;
+  padding: 2px 20px;
+}
+
+/* boutiques : panneau sombre et cartes de couleur selon la rareté */
+#accueil .boutique {
+  background: rgba(14, 18, 66, 0.9);
+  color: #fff;
+  border: 3px solid #5ad2ff;
+  box-shadow: 0 0 20px rgba(90, 210, 255, 0.6), 5px 5px 0 #000;
+}
+
+#accueil .boutique h3 {
+  color: #ffe600;
+  font-style: italic;
+  text-transform: uppercase;
+  text-shadow: 2px 2px 0 #000;
+}
+
+#accueil .boutique button {
+  color: #fff;
+  text-shadow: 1px 1px 0 #000;
+  border: 3px solid #000;
+  box-shadow: 0 4px 0 #000;
+}
+
+#accueil .boutique button:nth-child(1) { background: linear-gradient(135deg, #8a97b5, #4f5b7a); }  /* commun */
+#accueil .boutique button:nth-child(2) { background: linear-gradient(135deg, #5fd35f, #1f8a2e); }  /* peu commun */
+#accueil .boutique button:nth-child(3) { background: linear-gradient(135deg, #4aa8ff, #1f56c8); }  /* rare */
+#accueil .boutique button:nth-child(4) { background: linear-gradient(135deg, #c36bff, #6a1fb5); }  /* épique */
+
+#accueil .boutique button.possede { border-color: #7dff6b; }
+
+#accueil .boutique button.choisi {
+  border-color: #ffe600;
+  box-shadow: 0 0 14px #ffe600, 0 4px 0 #000;
+}
+
+#btnStart {
+  font-size: 3.6rem;
+  padding: 20px 70px;
+  color: #000;
+  background: linear-gradient(#fff36a, #ffc400);
+  box-shadow: 0 8px 0 #8a5a00, 0 0 30px rgba(255, 230, 0, 0.8);
+}
+
+#btn2Joueurs {
+  color: #000;
+  background: linear-gradient(#b8ff8a, #3fd04a);
+  box-shadow: 0 6px 0 #1b6a24;
+}
+
+#messageBoutique {
+  color: #fff;
+  font-style: italic;
+  text-shadow: 2px 2px 0 #000;
+}
+
+/* ---------- Écriture graffiti (style rue de Los Angeles) ---------- */
+body, button, #accueil {
+  font-family: "Permanent Marker", "Ink Free", "Segoe Print", "Marker Felt", "Comic Sans MS", cursive;
+  font-weight: bold;
+  letter-spacing: 0;
+}
+
+/* gros titres : lettres de bombe de peinture, remplies de couleurs avec un contour noir */
+.titre-accueil, h1 {
+  font-style: normal;
+  text-transform: uppercase;
+  transform: rotate(-4deg);
+  background: linear-gradient(90deg, #ff3fa4, #ffe600 45%, #3ff0ff);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  -webkit-text-stroke: 3px #000;
+  paint-order: stroke fill;
+  text-shadow: none;
+  filter: drop-shadow(4px 5px 0 #000) drop-shadow(0 12px 6px rgba(0, 0, 0, 0.4));
+}
+
+.lieu {
+  font-style: normal;
+  color: #3ff0ff;
+  -webkit-text-stroke: 1px #000;
+  transform: rotate(-2deg);
+  text-shadow: 3px 3px 0 #000;
+}
+
+#accueil .boutique h3 {
+  font-style: normal;
+  color: #ff3fa4;
+  -webkit-text-stroke: 1px #000;
+  text-shadow: 2px 2px 0 #000, 0 0 10px #ff3fa4;
+  transform: rotate(-2deg);
+}
+
+button, .score, .aide, #messageBoutique {
+  font-style: normal;
+}
