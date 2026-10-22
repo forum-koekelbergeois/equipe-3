@@ -206,6 +206,8 @@ canvas[hidden] {
 
 body.deux h1,
 body.deux .score,
+body.deux #btnPouvoir,
+body.deux #btnHelico,
 body.deux #btnSaut,
 body.deux #btnGlisse {
   display: none;
@@ -267,8 +269,19 @@ body.deux canvas {
   text-align: left;
 }
 
+/* avec 7 skins par boutique, la page peut défiler et les cartes sont plus basses */
+#accueil {
+  overflow-y: auto;
+  justify-content: safe center;
+}
+
+#accueil .boutique button {
+  margin-bottom: 5px;
+  padding: 4px 10px;
+}
+
 #accueil .boutique canvas {
-  height: 70px;
+  height: 52px;
   width: auto;
   max-width: none;
   border: 0;
@@ -387,6 +400,18 @@ button:active {
 #accueil .boutique button:nth-child(3) { background: linear-gradient(135deg, #4aa8ff, #1f56c8); }  /* rare */
 #accueil .boutique button:nth-child(4) { background: linear-gradient(135deg, #c36bff, #6a1fb5); }  /* épique */
 
+#accueil .boutique button:nth-child(5) { background: linear-gradient(135deg, #ff9a3f, #c24a00); }  /* légendaire */
+#accueil .boutique button:nth-child(6) { background: linear-gradient(135deg, #ff6b8a, #b5173f); }
+#accueil .boutique button:nth-child(7) { background: linear-gradient(135deg, #3fe0d0, #0a7f8a); }
+
+#accueil .boutique button:nth-child(n+8) { background: linear-gradient(135deg, #6a7ab5, #2f3a7a); }
+
+/* les listes sont longues : elles défilent */
+#listePersos, #listeVoitures {
+  max-height: 55vh;
+  overflow-y: auto;
+}
+
 #accueil .boutique button.possede { border-color: #7dff6b; }
 
 #accueil .boutique button.choisi {
@@ -454,4 +479,120 @@ body, button, #accueil {
 
 button, .score, .aide, #messageBoutique {
   font-style: normal;
+}
+
+/* Boutons Rejouer / Quitter quand la partie est perdue */
+#finPartie {
+  position: fixed;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  display: flex;
+  gap: 20px;
+}
+
+#finPartie[hidden] {
+  display: none;
+}
+
+#btnRejouer {
+  background: linear-gradient(#b8ff8a, #3fd04a);
+  box-shadow: 0 5px 0 #1b6a24;
+}
+
+/* Bouton d'achat de l'hélicoptère sur la page d'accueil */
+#btnAcheterHelico {
+  font-size: 1.2rem;
+  padding: 8px 18px;
+  color: #000;
+}
+
+#btnAcheterHelico.possede {
+  background: linear-gradient(#c8f7c5, #5fd35f);
+}
+
+/* ---------- Menu : fond noir, écriture rouge en graffiti ---------- */
+#accueil {
+  background: #000;
+}
+
+#accueil::after {
+  display: none;   /* plus d'immeubles : le fond est tout noir */
+}
+
+#accueil, #accueil button {
+  font-family: "Permanent Marker", "Ink Free", "Segoe Print", "Marker Felt", "Comic Sans MS", cursive;
+}
+
+/* gros titre : lettres rouges de bombe de peinture, avec une lueur */
+.titre-accueil {
+  background: none;
+  -webkit-background-clip: border-box;
+  background-clip: border-box;
+  color: #ff1a1a;
+  -webkit-text-stroke: 2px #4a0000;
+  paint-order: stroke fill;
+  text-shadow: 4px 5px 0 #5a0000, 0 0 22px rgba(255, 0, 0, 0.75);
+  filter: none;
+}
+
+.lieu {
+  color: #ff2a2a;
+  -webkit-text-stroke: 0;
+  text-shadow: 3px 3px 0 #4a0000, 0 0 12px rgba(255, 0, 0, 0.6);
+}
+
+.pieces-accueil {
+  background: #000;
+  color: #ff2a2a;
+  border-color: #ff2a2a;
+  text-shadow: 0 0 8px rgba(255, 0, 0, 0.6);
+}
+
+#accueil .boutique {
+  background: #000;
+  color: #ff2a2a;
+  border-color: #ff2a2a;
+  box-shadow: 0 0 20px rgba(255, 0, 0, 0.5), 5px 5px 0 #3a0000;
+}
+
+#accueil .boutique h3 {
+  color: #ff2a2a;
+  -webkit-text-stroke: 0;
+  text-shadow: 2px 2px 0 #4a0000, 0 0 10px rgba(255, 0, 0, 0.7);
+}
+
+/* tous les boutons du menu : noirs, écriture et contour rouges */
+#accueil button,
+#accueil .boutique button:nth-child(n) {
+  background: #0a0a0a;
+  color: #ff2a2a;
+  border: 3px solid #ff2a2a;
+  box-shadow: 0 4px 0 #5a0000, 0 0 12px rgba(255, 0, 0, 0.35);
+  text-shadow: 0 0 6px rgba(255, 0, 0, 0.6);
+}
+
+#accueil .boutique button.possede {
+  background: #1a0000;
+  border-color: #ff8a8a;
+}
+
+#accueil .boutique button.choisi {
+  background: #3a0000;
+  border-color: #ff2a2a;
+  box-shadow: 0 0 18px #ff0000, 0 4px 0 #000;
+}
+
+#accueil #btnAcheterHelico.possede {
+  background: #1a0000;
+  border-color: #ff8a8a;
+}
+
+#btnStart {
+  box-shadow: 0 8px 0 #5a0000, 0 0 30px rgba(255, 0, 0, 0.6);
+}
+
+#messageBoutique {
+  color: #ff2a2a;
+  text-shadow: 2px 2px 0 #4a0000, 0 0 10px rgba(255, 0, 0, 0.5);
 }

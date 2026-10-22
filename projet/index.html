@@ -8,10 +8,8 @@
 </head>
 <body>
   <div id="accueil">
-    <span class="palmier gauche">🌴</span>
-    <span class="palmier droite">🌴</span>
     <h2 class="titre-accueil">Cours et Esquive</h2>
-    <p class="lieu">Los Angeles</p>
+    <p class="lieu" id="lieuAccueil">Los Angeles</p>
     <p class="pieces-accueil">🪙 <span id="piecesAccueil">0</span> pièces</p>
     <div class="scene">
       <section class="boutique">
@@ -21,6 +19,7 @@
       <div class="centre">
         <button id="btnStart">START</button>
         <button id="btn2Joueurs">2 JOUEURS</button>
+        <button id="btnAcheterHelico">Hélicoptère</button>
       </div>
       <section class="boutique">
         <h3>Boutique personnages</h3>
@@ -34,14 +33,21 @@
     </section>
   </div>
   <h1>Cours et Esquive</h1>
-  <p class="score">Distance : <span id="score">0</span> m &nbsp; Record : <span id="record">0</span> m &nbsp; Pièces : <span id="pieces">0</span></p>
+  <p class="score">Distance : <span id="score">0</span> m &nbsp; Record : <span id="record">0</span> m &nbsp; Pièces : <span id="pieces">0</span> &nbsp; Pouvoir (M) : <span id="pouvoir">-</span></p>
   <canvas id="jeu" width="800" height="400"></canvas>
   <canvas id="jeu2" width="800" height="400" hidden></canvas>
   <p class="aide" id="aide">Espace = sauter &nbsp;&nbsp; Flèche du bas = roulade</p>
   <div class="boutons">
     <button id="btnSaut">Sauter</button>
     <button id="btnGlisse">Roulade</button>
+    <button id="btnPouvoir">Pouvoir</button>
+    <button id="btnHelico">Hélico (C)</button>
+    <button id="btnPause">Pause</button>
     <button id="btnAccueil">Accueil</button>
+  </div>
+  <div id="finPartie" hidden>
+    <button id="btnRejouer">Rejouer</button>
+    <button id="btnQuitter">Quitter</button>
   </div>
   <script src="script.js"></script>
 </body>
