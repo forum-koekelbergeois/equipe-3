@@ -1,0 +1,250 @@
+/* Version mobile : ces règles ne servent que sur écran tactile (classe « tactile » posée par mobile.js).
+   --s = réduction de la page, --u = 1 pixel de l'écran dans la page réduite. */
+
+html.tactile {
+  overflow: hidden;
+}
+
+/* toute la page est réduite d'un coup ; sa taille visible est exactement celle de l'écran */
+html.tactile body {
+  box-sizing: border-box;
+  width: var(--largeur);
+  height: var(--hauteur);
+  min-height: 0;
+  padding: var(--marge-haut) var(--marge-droite) var(--marge-bas) var(--marge-gauche);
+  justify-content: center;
+  overflow: hidden;
+  transform: scale(var(--s));
+  transform-origin: 0 0;
+}
+
+html.tactile.mesure body {
+  width: var(--largeur-mesure);
+  height: auto;
+  padding: 0;
+  transform: none;
+  justify-content: flex-start;
+}
+
+/* le jeu garde sa taille d'origine (800 × 400) : c'est la page entière qui est réduite */
+html.tactile #jeu,
+html.tactile #jeu2 {
+  width: auto;
+  height: auto;
+  max-width: none;
+}
+
+html.tactile button {
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+/* ---------- Menu : en portrait, START, puis les deux boutiques, l'un sous l'autre ---------- */
+html.tactile[data-sens="portrait"] .scene {
+  grid-template-columns: 1fr;
+}
+
+html.tactile[data-sens="portrait"] .centre {
+  order: -1;
+}
+
+/* le grand titre est penché : un peu de place autour pour qu'il ne soit pas coupé sur un petit écran */
+html.tactile #accueil {
+  padding: 24px 16px 0;
+}
+
+/* ---------- Boutons des jeunes, agrandis et placés à côté du jeu ---------- */
+html.tactile[data-ecran="jeu1"] .boutons button,
+html.tactile[data-ecran="jeu2"] #btnPause,
+html.tactile[data-ecran="jeu2"] #btnAccueil {
+  position: fixed;
+  z-index: 15;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-size: calc(18 * var(--u));
+  border-width: calc(3 * var(--u));
+}
+
+html.tactile[data-ecran="jeu1"] #btnSaut,
+html.tactile[data-ecran="jeu1"] #btnGlisse {
+  font-size: calc(22 * var(--u));
+}
+
+html.tactile #btnPause,
+html.tactile #btnAccueil {
+  font-size: calc(15 * var(--u));
+}
+
+/* 1 joueur, portrait : une bande en bas de l'écran */
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnPause,
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnAccueil {
+  bottom: calc(154 * var(--u));
+  width: 28%;
+  height: calc(44 * var(--u));
+}
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnPause { left: calc(12 * var(--u)); }
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnAccueil { right: calc(12 * var(--u)); }
+
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnGlisse,
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnSaut {
+  bottom: calc(12 * var(--u));
+  width: 30%;
+  height: calc(130 * var(--u));
+}
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnGlisse { left: calc(12 * var(--u)); }
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnSaut { right: calc(12 * var(--u)); }
+
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnPouvoir,
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnHelico {
+  left: 36%;
+  width: 28%;
+  height: calc(61 * var(--u));
+}
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnPouvoir { bottom: calc(81 * var(--u)); }
+html.tactile[data-ecran="jeu1"][data-sens="portrait"] #btnHelico { bottom: calc(12 * var(--u)); }
+
+/* 1 joueur, paysage : une colonne de chaque côté */
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] .boutons button {
+  width: calc(120 * var(--u));
+}
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnPause,
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnPouvoir,
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnGlisse { left: calc(16 * var(--u)); }
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnAccueil,
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnHelico,
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnSaut { right: calc(16 * var(--u)); }
+
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnPause,
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnAccueil {
+  top: calc(10 * var(--u));
+  height: calc(40 * var(--u));
+}
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnPouvoir,
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnHelico {
+  top: calc(62 * var(--u));
+  height: calc(70 * var(--u));
+}
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnGlisse,
+html.tactile[data-ecran="jeu1"][data-sens="paysage"] #btnSaut {
+  bottom: calc(16 * var(--u));
+  height: calc(100% - 160 * var(--u));
+  max-height: calc(220 * var(--u));
+}
+
+/* 2 joueurs : Pause et Accueil des jeunes */
+html.tactile[data-ecran="jeu2"] #btnPause,
+html.tactile[data-ecran="jeu2"] #btnAccueil {
+  height: calc(40 * var(--u));
+}
+html.tactile[data-ecran="jeu2"][data-sens="portrait"] #btnPause,
+html.tactile[data-ecran="jeu2"][data-sens="portrait"] #btnAccueil {
+  bottom: calc(124 * var(--u));
+  width: 40%;
+}
+html.tactile[data-ecran="jeu2"][data-sens="portrait"] #btnPause { left: calc(12 * var(--u)); }
+html.tactile[data-ecran="jeu2"][data-sens="portrait"] #btnAccueil { right: calc(12 * var(--u)); }
+
+html.tactile[data-ecran="jeu2"][data-sens="paysage"] #btnPause,
+html.tactile[data-ecran="jeu2"][data-sens="paysage"] #btnAccueil {
+  top: calc(8 * var(--u));
+  width: calc(114 * var(--u));
+}
+html.tactile[data-ecran="jeu2"][data-sens="paysage"] #btnPause { left: calc(8 * var(--u)); }
+html.tactile[data-ecran="jeu2"][data-sens="paysage"] #btnAccueil { right: calc(8 * var(--u)); }
+
+/* Rejouer / Quitter : même place que dans le jeu, en taille confortable */
+html.tactile #finPartie {
+  top: var(--fin-haut) !important;
+  gap: calc(16 * var(--u));
+}
+
+html.tactile #finPartie button {
+  font-size: calc(20 * var(--u));
+  padding: calc(8 * var(--u)) calc(22 * var(--u));
+  border-width: calc(3 * var(--u));
+}
+
+/* ---------- Commandes tactiles du mode 2 joueurs (ajoutées par mobile.js) ---------- */
+#mobileCommandes {
+  display: none;
+}
+
+html.tactile[data-ecran="jeu2"] #mobileCommandes {
+  display: block;
+}
+
+.mobile-groupe {
+  position: fixed;
+  z-index: 20;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 4px 10px 10px;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.mobile-titre {
+  color: #fff;
+  font-family: "Permanent Marker", "Ink Free", "Segoe Print", "Marker Felt", "Comic Sans MS", cursive;
+  font-size: 14px;
+  line-height: 16px;
+  text-align: center;
+  text-shadow: 1px 1px 0 #000;
+}
+
+.mobile-rangee {
+  flex: 1;
+  display: flex;
+  gap: 8px;
+  min-height: 0;
+}
+
+.mobile-groupe button {
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+  margin: 0;
+  padding: 0;
+  font-size: 17px;
+  touch-action: none;
+}
+
+.mobile-groupe button.appuye {
+  transform: skewX(-6deg) translateY(4px);
+  box-shadow: 0 1px 0 #8a5a00;
+}
+
+html[data-sens="portrait"] .mobile-groupe {
+  left: 0;
+  right: 0;
+  height: 120px;
+}
+
+html[data-sens="portrait"] .mobile-groupe[data-joueur="1"] { top: 0; }
+html[data-sens="portrait"] .mobile-groupe[data-joueur="2"] { bottom: 0; }
+
+html[data-sens="paysage"] .mobile-groupe {
+  top: 52px;
+  bottom: 0;
+  width: 130px;
+  padding: 4px 8px 8px;
+}
+
+html[data-sens="paysage"] .mobile-rangee {
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+html[data-sens="paysage"] .mobile-groupe button {
+  max-height: 110px;
+}
+
+html[data-sens="paysage"] .mobile-groupe[data-joueur="1"] { left: 0; }
+html[data-sens="paysage"] .mobile-groupe[data-joueur="2"] { right: 0; }
